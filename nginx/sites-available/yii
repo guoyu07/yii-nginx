@@ -1,0 +1,75 @@
+server { 
+	listen 63; 
+	server_name localhost; 
+	root /var/www/yii; 
+	
+	access_log /var/log/nginx/yii_access.log;
+	error_log /var/log/nginx/yii_error.log;
+
+	index  index.php;
+	client_max_body_size 25M; 
+	default_type text/html;
+	charset utf-8;
+
+	location = /favicon.ico {
+        try_files /favicon.ico =204;
+    }
+
+    ## The main location is accessed using Basic Auth.
+    location / {
+        
+        ## Use PATH_INFO for translating the requests to the
+        ## FastCGI. This config follows Igor's suggestion here:
+        ## http://forum.nginx.org/read.php?2,124378,124582.
+        ## This is preferable to using:
+        ## fastcgi_split_path_info ^(.+\.php)(.*)$
+        ## It saves one regex in the location. Hence it's faster.
+        location ~ ^(?<script>.+\.php)(?<path_info>.*)$ {
+            include fastcgi_params;
+            ## The fastcgi_params must be redefined from the ones
+            ## given in fastcgi.conf. No longer standard names
+            ## but arbitrary: named patterns in regex.
+            fastcgi_param SCRIPT_FILENAME $document_root$script;
+            fastcgi_param SCRIPT_NAME $script;
+            fastcgi_param PATH_INFO $path_info;
+            ## Passing the request upstream to the FastCGI
+            ## listener.
+            fastcgi_pass unix:/tmp/php5-fpm.sock;
+        }
+
+        ## Protect these locations. Replicating the .htaccess
+        ## rules throughout the chive distro.
+        location /protected {
+            internal;
+        }
+
+        location /yii {
+            internal;
+        }
+
+        ## Static file handling.
+        location ~* .+\.(?:css|gif|htc|js|jpe?g|png|swf)$ {
+            expires max;
+            ## No need to bleed constant updates. Send the all shebang in one
+            ## fell swoop.
+            tcp_nodelay off;
+            ## Set the OS file cache.
+            open_file_cache max=100 inactive=120s;
+            open_file_cache_valid 45s;
+            open_file_cache_min_uses 2;
+            open_file_cache_errors off;
+        }
+    }
+
+    ## We need to capture the case where the index.php is missing,
+    ## hence we drop out of the path info thingie.
+    location ~* /([^\.])$ {
+        return 302 /index.php/$1;
+    }
+
+    ## Close up git repo access.
+    location ^~ /.git {
+        return 404;
+    }
+
+}
