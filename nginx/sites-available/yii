@@ -43,7 +43,7 @@ server {
             internal;
         }
 
-        location /yii {
+        location /framework {
             internal;
         }
 
